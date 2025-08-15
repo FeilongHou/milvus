@@ -17,7 +17,6 @@
 package paramtable
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -531,14 +530,6 @@ This configuration is only used by querynode and indexnode, it selects CPU instr
 		Export:       true,
 	}
 	p.IndexSliceSize.Init(base.mgr)
-	p.IndexSliceSize.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		size, err := strconv.Atoi(newValue)
-		if err != nil {
-			return err
-		}
-		UpdateIndexSliceSize(size)
-		return nil
-	})
 
 	p.EnableMaterializedView = ParamItem{
 		Key:          "common.materializedView.enabled",
@@ -640,14 +631,6 @@ This configuration is only used by querynode and indexnode, it selects CPU instr
 		Export: true,
 	}
 	p.HighPriorityThreadCoreCoefficient.Init(base.mgr)
-	p.HighPriorityThreadCoreCoefficient.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		coefficient, err := strconv.ParseFloat(newValue, 64)
-		if err != nil {
-			return err
-		}
-		UpdateHighPriorityThreadCoreCoefficient(coefficient)
-		return nil
-	})
 
 	p.MiddlePriorityThreadCoreCoefficient = ParamItem{
 		Key:          "common.threadCoreCoefficient.middlePriority",
@@ -658,14 +641,6 @@ This configuration is only used by querynode and indexnode, it selects CPU instr
 		Export: true,
 	}
 	p.MiddlePriorityThreadCoreCoefficient.Init(base.mgr)
-	p.MiddlePriorityThreadCoreCoefficient.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		coefficient, err := strconv.ParseFloat(newValue, 64)
-		if err != nil {
-			return err
-		}
-		UpdateMiddlePriorityThreadCoreCoefficient(coefficient)
-		return nil
-	})
 
 	p.LowPriorityThreadCoreCoefficient = ParamItem{
 		Key:          "common.threadCoreCoefficient.lowPriority",
@@ -676,14 +651,6 @@ This configuration is only used by querynode and indexnode, it selects CPU instr
 		Export: true,
 	}
 	p.LowPriorityThreadCoreCoefficient.Init(base.mgr)
-	p.LowPriorityThreadCoreCoefficient.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		coefficient, err := strconv.ParseFloat(newValue, 64)
-		if err != nil {
-			return err
-		}
-		UpdateLowPriorityThreadCoreCoefficient(coefficient)
-		return nil
-	})
 
 	p.DiskWriteMode = ParamItem{
 		Key:          "common.diskWriteMode",
@@ -1097,14 +1064,6 @@ This helps Milvus-CDC synchronize incremental data`,
 		Export:       true,
 	}
 	p.EnabledOptimizeExpr.Init(base.mgr)
-	p.EnabledOptimizeExpr.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		enable, err := strconv.ParseBool(newValue)
-		if err != nil {
-			return err
-		}
-		UpdateDefaultOptimizeExprEnable(enable)
-		return nil
-	})
 
 	p.EnabledJSONKeyStats = ParamItem{
 		Key:          "common.enabledJSONKeyStats",
@@ -1123,14 +1082,6 @@ This helps Milvus-CDC synchronize incremental data`,
 		Export:       true,
 	}
 	p.EnabledGrowingSegmentJSONKeyStats.Init(base.mgr)
-	p.EnabledGrowingSegmentJSONKeyStats.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		enable, err := strconv.ParseBool(newValue)
-		if err != nil {
-			return err
-		}
-		UpdateDefaultGrowingJSONKeyStatsEnable(enable)
-		return nil
-	})
 
 	p.EnableConfigParamTypeCheck = ParamItem{
 		Key:          "common.enableConfigParamTypeCheck",
@@ -1140,14 +1091,6 @@ This helps Milvus-CDC synchronize incremental data`,
 		Export:       true,
 	}
 	p.EnableConfigParamTypeCheck.Init(base.mgr)
-	p.EnableConfigParamTypeCheck.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		enable, err := strconv.ParseBool(newValue)
-		if err != nil {
-			return err
-		}
-		UpdateDefaultConfigParamTypeCheck(enable)
-		return nil
-	})
 }
 
 type gpuConfig struct {
@@ -1254,7 +1197,7 @@ Fractions >= 1 will always sample. Fractions < 0 are treated as zero.`,
 
 	t.OtlpHeaders = ParamItem{
 		Key:          "trace.otlp.headers",
-		Version:      "2.4.0",
+		Version:      "2.6.0",
 		DefaultValue: "",
 		Doc:          "otlp header that encoded in base64",
 		Export:       true,
@@ -1388,9 +1331,6 @@ It is recommended to use debug level under test and development environments, an
 		Export: true,
 	}
 	l.Level.Init(base.mgr)
-	l.Level.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		return UpdateLogLevel(newValue)
-	})
 
 	l.RootPath = ParamItem{
 		Key:     "log.file.rootPath",
@@ -2952,8 +2892,11 @@ type queryNodeConfig struct {
 	MaxGroupNQ            ParamItem `refreshable:"true"`
 	TopKMergeRatio        ParamItem `refreshable:"true"`
 	CPURatio              ParamItem `refreshable:"true"`
-	MaxTimestampLag       ParamItem `refreshable:"true"`
 	GracefulStopTimeout   ParamItem `refreshable:"false"`
+
+	// tsafe
+	MaxTimestampLag ParamItem `refreshable:"true"`
+	DowngradeTsafe  ParamItem `refreshable:"true"`
 
 	// delete buffer
 	MaxSegmentDeleteBuffer ParamItem `refreshable:"false"`
@@ -3807,6 +3750,15 @@ Max read concurrency must greater than or equal to 1, and less than or equal to 
 	}
 	p.MaxTimestampLag.Init(base.mgr)
 
+	p.DowngradeTsafe = ParamItem{
+		Key:          "queryNode.downgradeTsafe",
+		Version:      "2.5.17",
+		Doc:          "ops maintenance switch for downgrade tsafe in case of mq failure",
+		DefaultValue: "false",
+		Export:       false,
+	}
+	p.DowngradeTsafe.Init(base.mgr)
+
 	p.GracefulStopTimeout = ParamItem{
 		Key:          "queryNode.gracefulStopTimeout",
 		Version:      "2.2.1",
@@ -3943,14 +3895,6 @@ user-task-polling:
 		Doc:          "expr eval batch size for getnext interface",
 	}
 	p.ExprEvalBatchSize.Init(base.mgr)
-	p.ExprEvalBatchSize.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		size, err := strconv.Atoi(newValue)
-		if err != nil {
-			return err
-		}
-		UpdateDefaultExprEvalBatchSize(size)
-		return nil
-	})
 
 	p.JSONKeyStatsCommitInterval = ParamItem{
 		Key:          "queryNode.segcore.jsonKeyStatsCommitInterval",
@@ -3960,14 +3904,6 @@ user-task-polling:
 		Export:       true,
 	}
 	p.JSONKeyStatsCommitInterval.Init(base.mgr)
-	p.JSONKeyStatsCommitInterval.RegisterCallback(func(ctx context.Context, key, oldValue, newValue string) error {
-		interval, err := strconv.Atoi(newValue)
-		if err != nil {
-			return err
-		}
-		UpdateDefaultJSONKeyStatsCommitInterval(interval)
-		return nil
-	})
 
 	p.CleanExcludeSegInterval = ParamItem{
 		Key:          "queryCoord.cleanExcludeSegmentInterval",
